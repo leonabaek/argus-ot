@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARGUS — OT FILE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0b0c;
+    --bg-alt:#131315;
+    --surface:#18181b;
+    --line:#2a2a2d;
+    --text:#eae7e1;
+    --text-dim:#8d8b87;
+    --red:#7d2331;
+    --red-bright:#a83346;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    overflow-x:hidden;
+  }
+  ::selection{background:var(--red);color:#fff;}
+
+  /* background grid texture */
+  .grid-bg{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size:64px 64px;
+  }
+
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px; letter-spacing:0.25em; text-transform:uppercase;
+    color:var(--text-dim);
+  }
+
+  /* redaction reveal */
+  .redact{
+    background:var(--red);
+    color:var(--red);
+    border-radius:2px;
+    padding:0 2px;
+    transition:color 1.1s ease, background 1.1s ease;
+    transition-delay:.15s;
+  }
+  .redact.revealed{ background:transparent; color:inherit; }
+
+  /* side nav */
+  nav.dossier-nav{
+    position:fixed; right:28px; top:50%; transform:translateY(-50%);
+    z-index:50; display:flex; flex-direction:column; gap:22px; align-items:center;
+  }
+  nav.dossier-nav a{
+    text-decoration:none; color:var(--text-dim); font-family:'IBM Plex Mono',monospace;
+    font-size:13px; position:relative; padding:4px 0; transition:color .3s ease;
+  }
+  nav.dossier-nav a.active{ color:var(--red-bright); }
+  nav.dossier-nav .rail{
+    position:absolute; left:50%; top:-16px; width:1px; height:16px;
+    background:var(--line); transform:translateX(-50%);
+  }
+  nav.dossier-nav a:first-child .rail{ display:none; }
+  @media (max-width:720px){ nav.dossier-nav{ display:none; } }
+
+  /* ===== HERO ===== */
+  header.hero{
+    position:relative; z-index:1;
+    min-height:100vh; display:flex; flex-direction:column; justify-content:center;
+    padding:14vh 8vw 10vh;
+    border-bottom:1px solid var(--line);
+  }
+  .hero .wordmark{
+    font-family:'IBM Plex Mono',monospace; font-size:14px; letter-spacing:.35em;
+    color:var(--text-dim); margin-bottom:40px;
+  }
+  .hero .wordmark span{ color:var(--red-bright); }
+  h1.title{
+    font-family:'Fraunces',serif; font-weight:900; font-size:clamp(64px,14vw,168px);
+    line-height:.88; letter-spacing:-0.02em; margin-bottom:8px;
+  }
+  h1.title em{ font-style:italic; font-weight:500; color:var(--text-dim); font-size:.35em; display:block; letter-spacing:0.02em; margin-top:14px;}
+  .hero .lede{
+    max-width:640px; margin-top:48px; font-size:17px; line-height:1.85; color:#c7c4bf;
+  }
+  .scroll-cue{
+    margin-top:64px; font-family:'IBM Plex Mono',monospace; font-size:12px;
+    letter-spacing:.2em; color:var(--text-dim); display:flex; align-items:center; gap:10px;
+  }
+  .scroll-cue::after{
+    content:''; width:1px; height:40px; background:linear-gradient(var(--red-bright),transparent);
+    animation:pulse-line 2s ease-in-out infinite;
+  }
+  @keyframes pulse-line{ 0%,100%{opacity:.3} 50%{opacity:1} }
+
+  /* ===== AGENT SECTION ===== */
+  section.agent{
+    position:relative; z-index:1;
+    min-height:100vh; display:flex; align-items:center;
+    padding:100px 8vw; border-bottom:1px solid var(--line);
+    overflow:hidden;
+  }
+  section.agent .ghost-num{
+    position:absolute; top:50%; transform:translateY(-50%);
+    font-family:'Fraunces',serif; font-weight:900; font-size:min(46vw,560px);
+    color:transparent; -webkit-text-stroke:1px var(--line); line-height:1; z-index:0;
+    user-select:none; pointer-events:none;
+  }
+  section.agent.right .ghost-num{ right:-4vw; }
+  section.agent.left .ghost-num{ left:-4vw; }
+
+  .agent-grid{
+    position:relative; z-index:1; width:100%;
+    display:grid; grid-template-columns:340px 1fr; gap:80px; align-items:start;
+  }
+  section.agent.right .agent-grid{ grid-template-columns:1fr 340px; }
+  section.agent.right .portrait{ order:2; }
+  section.agent.right .info{ order:1; }
+
+  .portrait{
+    aspect-ratio:3/4; border:1px solid var(--line); background:var(--surface);
+    display:flex; align-items:center; justify-content:center; position:relative;
+    background-image:repeating-linear-gradient(135deg, rgba(255,255,255,.02) 0 2px, transparent 2px 14px);
+  }
+  .portrait img{ width:100%; height:100%; object-fit:cover; display:block; filter:grayscale(.15) contrast(1.05); }
+  .portrait .stamp{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.15em;
+    color:var(--text-dim); border:1px solid var(--line); padding:10px 16px;
+    text-align:center; transform:rotate(-6deg);
+  }
+  .portrait .stamp b{ display:block; color:var(--red-bright); font-size:13px; margin-bottom:4px; letter-spacing:.2em;}
+  .portrait .corner{ position:absolute; width:14px; height:14px; border:1px solid var(--text-dim); opacity:.5;}
+  .portrait .corner.tl{ top:10px; left:10px; border-right:none; border-bottom:none;}
+  .portrait .corner.tr{ top:10px; right:10px; border-left:none; border-bottom:none;}
+  .portrait .corner.bl{ bottom:10px; left:10px; border-right:none; border-top:none;}
+  .portrait .corner.br{ bottom:10px; right:10px; border-left:none; border-top:none;}
+
+  .info .file-label{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:.2em;
+    color:var(--red-bright); margin-bottom:18px;
+  }
+  .info h2{
+    font-family:'Fraunces',serif; font-weight:800; font-size:clamp(38px,4.4vw,58px);
+    line-height:1.02; margin-bottom:6px;
+  }
+  .info .en-name{
+    font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--text-dim);
+    letter-spacing:.1em; margin-bottom:22px;
+  }
+  .tags{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:28px; }
+  .tags span{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.05em;
+    border:1px solid var(--line); color:var(--text-dim); padding:6px 12px; text-transform:uppercase;
+  }
+  .info .bio{ max-width:560px; font-size:16px; line-height:1.9; color:#cfccc6; margin-bottom:30px;}
+  .info .quote{
+    font-family:'Fraunces',serif; font-style:italic; font-weight:500; font-size:22px;
+    color:var(--text); border-left:2px solid var(--red); padding-left:20px; max-width:520px; margin-bottom:32px;
+  }
+  .relations{ display:flex; gap:40px; flex-wrap:wrap; }
+  .relations div .k{ font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.15em; color:var(--text-dim); text-transform:uppercase; margin-bottom:6px;}
+  .relations div .v{ font-family:'IBM Plex Mono',monospace; font-size:14px; color:var(--text); }
+
+  @media (max-width:900px){
+    .agent-grid, section.agent.right .agent-grid{ grid-template-columns:1fr; gap:36px; }
+    section.agent.right .portrait, section.agent.right .info{ order:0; }
+    .portrait{ max-width:280px; }
+    section.agent{ padding:80px 6vw; }
+  }
+
+  /* ===== FOOTER ===== */
+  footer{
+    position:relative; z-index:1; padding:60px 8vw 50px; text-align:center;
+  }
+  footer .mark{ font-family:'IBM Plex Mono',monospace; font-size:13px; letter-spacing:.3em; color:var(--text-dim); margin-bottom:10px;}
+  footer .note{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:#5c5a57; letter-spacing:.05em;}
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+
+<nav class="dossier-nav">
+  <a href="#a01">01</a>
+  <a href="#a06"><span class="rail"></span>06</a>
+  <a href="#a18"><span class="rail"></span>18</a>
+  <a href="#a24"><span class="rail"></span>24</a>
+</nav>
+
+<header class="hero">
+  <div class="wordmark">A R G U S <span>· INTERNAL FILE</span></div>
+  <h1 class="title">OT<em>Original Team — 비공식 기록</em></h1>
+  <p class="lede">
+    ARGUS는 스위스에 본사를 둔 국제 보안·경호 기업입니다. 표면적으로는 VIP 경호, 기업 보안, 위기관리를
+    합법적으로 수행합니다. 그러나 조직 내부에는 <span class="redact" data-redact>공식 조직도에 존재하지 않는 무장 작전 조직</span>이
+    있습니다. 국가와 정보기관이 <span class="redact" data-redact>공식적으로 처리할 수 없는 문제</span>를 은밀히 맡는 자들 —
+    그들의 이름은 회사 기록 어디에도 남지 않습니다.
+    이 페이지는 그중에서도 가장 오래된 현장팀, <span class="redact" data-redact>OT</span>의 네 요원에 대한 비공식 기록입니다.
+  </p>
+  <div class="scroll-cue">SCROLL TO ACCESS FILES</div>
+</header>
+
+<!-- ===== AGENT 01 ===== -->
+<section class="agent left" id="a01">
+  <div class="ghost-num">01</div>
+  <div class="agent-grid">
+    <div class="portrait">
+      <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+      <img src="images/agent-01-graham.png" alt="그레이엄 콜">
+    </div>
+    <div class="info">
+      <div class="file-label">AGENT FILE — NO. 01</div>
+      <h2>그레이엄 콜</h2>
+      <div class="en-name">GRAHAM COLE · 영국 · 51세</div>
+      <div class="tags"><span>다목적 현장요원</span><span>전술</span><span>정찰</span><span>경호</span></div>
+      <p class="bio">
+        30년 이상 특수부대와 ARGUS 현장을 넘나든 괴물급 베테랑. 퇴물처럼 보이는 낡은 인상과 달리
+        전투, 전술, 정찰, 경호 등 모든 현장 업무에 능숙하다. 무심하고 건조한 말투 뒤에는
+        팀원들의 식사와 건강까지 챙기는 가정적인 성격이 숨어 있다. 자신의 가정을 만드는 대신 팀을 택했고,
+        OT를 가족으로 여긴다. 무엇보다 팀원을 살려 귀환시키는 것을 최우선으로 삼는다.
+      </p>
+      <div class="quote">"죽는 것보다 두려운 건, 데려오지 못하는 것이다."</div>
+      <div class="relations">
+        <div><div class="k">가장 가까운 팀원</div><div class="v">NO. 24</div></div>
+        <div><div class="k">자주 충돌</div><div class="v">NO. 06</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== AGENT 06 ===== -->
+<section class="agent right" id="a06">
+  <div class="ghost-num">06</div>
+  <div class="agent-grid">
+    <div class="portrait">
+      <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+      <img src="images/agent-06-chulyong.png" alt="강철용">
+    </div>
+    <div class="info">
+      <div class="file-label">AGENT FILE — NO. 06</div>
+      <h2>강철용</h2>
+      <div class="en-name">KANG CHUL-YONG · 대한민국 · 47세</div>
+      <div class="tags"><span>현장 지휘</span><span>근접전</span><span>대테러</span><span>경호</span></div>
+      <p class="bio">
+        특수전 및 대테러 부대 출신의 현장 지휘관. 입은 험하고 성질은 더럽지만, 한번 맡은 사람은
+        끝까지 책임지는 시발데레. 군 복무와 해외 파병 중 아내와 이혼했고, 자신의 부재가
+        원인이라 생각한다. 감정을 표현하지 못해 걱정과 애정이 화와 잔소리로 나온다.
+        짧고 직설적인 말투에 욕설이 자연스럽게 섞인다.
+      </p>
+      <div class="quote">"죽으면 죽는다고 말이라도 하고 뒤져."</div>
+      <div class="relations">
+        <div><div class="k">가장 가까운 팀원</div><div class="v">NO. 18</div></div>
+        <div><div class="k">자주 충돌</div><div class="v">NO. 24</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== AGENT 18 ===== -->
+<section class="agent left" id="a18">
+  <div class="ghost-num">18</div>
+  <div class="agent-grid">
+    <div class="portrait">
+      <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+      <img src="images/agent-18-volkov.png" alt="미하일 볼코프">
+    </div>
+    <div class="info">
+      <div class="file-label">AGENT FILE — NO. 18</div>
+      <h2>미하일 볼코프</h2>
+      <div class="en-name">MICHAEL VOLKOV · 러시아 · 39세</div>
+      <div class="tags"><span>근접전</span><span>강습</span><span>침투</span></div>
+      <p class="bio">
+        네 명 중 가장 큰 체격, 가장 적은 말수. 조용한 분위기만으로도 위압감을 주는
+        근접전·강습 전문가. 어린 시절 가족을 지키기 위해 군인이 되었으나 결국 모두 잃었고,
+        군대 외엔 갈 곳이 없어 평생을 작전 속에서 살아왔다. 결혼이나 가정을 원하지 않는다.
+        겉으로는 6번의 명령을 무시하는 듯 보이지만, 실은 상황을 판단해 스스로 움직인다.
+      </p>
+      <div class="quote">"필요없다."</div>
+      <div class="relations">
+        <div><div class="k">비교적 가까운 팀원</div><div class="v">NO. 24</div></div>
+        <div><div class="k">자주 충돌</div><div class="v">NO. 06</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== AGENT 24 ===== -->
+<section class="agent right" id="a24">
+  <div class="ghost-num">24</div>
+  <div class="agent-grid">
+    <div class="portrait">
+      <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+      <img src="images/agent-24-vincenzo.png" alt="빈센조 모레티">
+    </div>
+    <div class="info">
+      <div class="file-label">AGENT FILE — NO. 24</div>
+      <h2>빈센조 모레티</h2>
+      <div class="en-name">VINCENZO MORRETTI · 이탈리아 · 42세 · 187cm</div>
+      <div class="tags"><span>정보 수집</span><span>심리전</span><span>협상</span><span>SIG P226</span></div>
+      <p class="bio">
+        능글맞고 여유롭지만, 실제로는 누구도 쉽게 믿지 않는 냉정한 관찰자. 정보원 출신으로
+        정보 수집, 심리 파악, 협상에 특화되어 있다. 위험할수록 농담을 던지며 침착함을 유지한다.
+        왼쪽 옆구리엔 죽은 아내를 기리는 문신이 있다. 아내의 죽음에 대한 복수를 끝낸 뒤에도
+        평범한 삶에 적응하지 못해, 20년 넘게 ARGUS로 돌아와 활동하고 있다. 한번 자신의 사람으로
+        받아들인 상대는 끝까지 책임진다.
+      </p>
+      <div class="quote">"긴장 풀어. 내가 있잖아."</div>
+      <div class="relations">
+        <div><div class="k">가장 가까운 팀원</div><div class="v">NO. 01</div></div>
+        <div><div class="k">자주 충돌</div><div class="v">NO. 06</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="mark">A R G U S</div>
+  <div class="note">이 기록은 비공식 문서입니다 · 회사 공식 자료에는 존재하지 않습니다</div>
+</footer>
+
+<script>
+  // 스크롤 시 레닥션(검은 줄) 텍스트 순차 공개
+  const redacts = document.querySelectorAll('[data-redact]');
+  const io = new IntersectionObserver((entries)=>{
+    entries.forEach((e,i)=>{
+      if(e.isIntersecting){
+        setTimeout(()=> e.target.classList.add('revealed'), i*300 + 400);
+        io.unobserve(e.target);
+      }
+    });
+  }, {threshold:0.6});
+  redacts.forEach(el=>io.observe(el));
+
+  // 사이드 내비게이션 active 상태
+  const navLinks = document.querySelectorAll('.dossier-nav a');
+  const sections = document.querySelectorAll('section.agent');
+  const navIO = new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{
+      if(e.isIntersecting){
+        navLinks.forEach(l=>l.classList.remove('active'));
+        const link = document.querySelector('.dossier-nav a[href="#'+e.target.id+'"]');
+        if(link) link.classList.add('active');
+      }
+    });
+  }, {threshold:0.5});
+  sections.forEach(s=>navIO.observe(s));
+</script>
+
+</body>
+</html>
